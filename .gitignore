@@ -1,0 +1,5 @@
+steam/.env
+psn/.env
+.venv/
+*_achievements.csv
+psn/node_modules/

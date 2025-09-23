@@ -27,7 +27,11 @@ type TrophyRow = {
   name: string;
   description: string;
   rarity_bucket: string;
-  earned_rate_pct: number | "";
+
+
+  earned_rate_pct: number | string | "";
+
+
   hidden: "true" | "false";
   icon: string;
   np_communication_id: string;
@@ -122,6 +126,7 @@ export async function authFromNpsso(npsso: string): Promise<Authorization> {
   }
 }
 
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -182,10 +187,7 @@ function extractNpCommunicationId(value: unknown, visited = new Set<any>()): str
   return undefined;
 }
 
-export async function findNpCommunicationId(
-  authorization: Authorization,
-  gameQuery: string,
-): Promise<string> {
+
   const searchDomains = [
     "ConceptGame",
     "GameContent",
@@ -204,6 +206,7 @@ export async function findNpCommunicationId(
       );
       const domainResponses: any[] = searchResponse?.domainResponses ?? [];
       const candidates = domainResponses.flatMap((item) => item?.results ?? []);
+
       let bestMatch: { id: string; likelyGame: boolean } | undefined;
 
       for (const result of candidates) {
@@ -250,6 +253,7 @@ export async function findNpCommunicationId(
     `Failed to resolve NP Communication ID: ${combinedMessage}`,
     3,
   );
+
 }
 
 function normalizeGroupId(groupId: string | undefined): string {
@@ -307,7 +311,10 @@ export async function fetchTrophies(
           name: trophy?.trophyName ?? trophy?.name ?? "",
           description: trophy?.trophyDetail ?? trophy?.detail ?? "",
           rarity_bucket: typeof rarity === "string" ? rarity : String(rarity ?? ""),
-          earned_rate_pct: earnedRate,
+
+          earned_rate_pct: typeof earnedRate === "number" ? `${earnedRate}%` : earnedRate,
+
+
           hidden: trophy?.trophyHidden ? "true" : "false",
           icon: trophy?.trophyIconUrl ?? trophy?.iconUrl ?? "",
           np_communication_id: npCommunicationId,
@@ -333,8 +340,15 @@ function sortRows(rows: TrophyRow[]): TrophyRow[] {
     if (a.hidden !== b.hidden) {
       return a.hidden === "true" ? 1 : -1;
     }
-    const rateA = typeof a.earned_rate_pct === "number" ? a.earned_rate_pct : -Infinity;
-    const rateB = typeof b.earned_rate_pct === "number" ? b.earned_rate_pct : -Infinity;
+
+    const rateA = typeof a.earned_rate_pct === "number" ? a.earned_rate_pct : 
+                  typeof a.earned_rate_pct === "string" && a.earned_rate_pct.endsWith("%") ? 
+                    parseFloat(a.earned_rate_pct.slice(0, -1)) : -Infinity;
+    const rateB = typeof b.earned_rate_pct === "number" ? b.earned_rate_pct : 
+                  typeof b.earned_rate_pct === "string" && b.earned_rate_pct.endsWith("%") ? 
+                    parseFloat(b.earned_rate_pct.slice(0, -1)) : -Infinity;
+
+
     return rateB - rateA;
   });
 }
