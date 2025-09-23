@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "dotenv": "^16.4.5",
+
     "psn-api": "^2.14.0"
   },
   "devDependencies": {

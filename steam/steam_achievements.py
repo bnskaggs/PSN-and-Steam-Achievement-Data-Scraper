@@ -12,7 +12,9 @@ import requests
 from dotenv import load_dotenv
 
 API_GLOBAL_URL = "https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/"
+
 API_SCHEMA_URL = "https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/"
+
 
 REQUEST_TIMEOUT = 20
 RETRY_STATUS = {500, 502, 503, 504}
@@ -114,7 +116,9 @@ def sort_rows(rows: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
         percent = row.get("global_percent")
         missing_percent = 1 if percent in (None, "") else 0
         hidden = 1 if row.get("hidden") in (True, "true", "True", 1) else 0
+
         percent_value = -float(percent.rstrip('%')) if percent not in (None, "") else 0.0
+
         return (missing_percent, hidden, percent_value)
 
     return sorted(rows, key=sort_key)
@@ -154,7 +158,8 @@ def generate_rows(
                 "hidden": "true" if meta.get("hidden") else "false",
                 "icon": meta.get("icon", ""),
                 "icon_gray": meta.get("icon_gray", ""),
-                "global_percent": f"{percent:.6f}%" if isinstance(percent, float) else "",
+    "global_percent": f"{percent:.6f}%" if isinstance(percent, float) else "",
+
             }
         )
     return sort_rows(rows)

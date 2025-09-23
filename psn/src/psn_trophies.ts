@@ -27,7 +27,11 @@ type TrophyRow = {
   name: string;
   description: string;
   rarity_bucket: string;
+
+  earned_rate_pct: number | "";
+
   earned_rate_pct: number | string | "";
+
   hidden: "true" | "false";
   icon: string;
   np_communication_id: string;
@@ -126,27 +130,57 @@ export async function findNpCommunicationId(
   authorization: Authorization,
   gameQuery: string,
 ): Promise<string> {
-  try {
-    const searchResponse: any = await makeUniversalSearch(authorization, gameQuery);
-    const domainResponses: any[] = searchResponse?.domainResponses ?? [];
-    const candidates = domainResponses.flatMap((domain) => domain?.results ?? []);
-    const gameResult = candidates.find((result) => {
-      const type = (result?.mediaType ?? result?.type ?? "").toString().toLowerCase();
-      return type.includes("game");
-    });
-    const npCommunicationId =
-      gameResult?.id?.npCommunicationId ||
-      gameResult?.id?.communicationId ||
-      gameResult?.id?.value ||
-      gameResult?.metadata?.npCommunicationId;
-    if (!npCommunicationId) {
-      throw new Error("No game results contained an NP Communication ID.");
+
+  const searchDomains = [
+    "ConceptGame",
+    "GameContent",
+    "UnifiedGameAndDlc",
+    "Game",
+    "SocialAllAccounts",
+  ];
+  const errors: string[] = [];
+
+  for (const domain of searchDomains) {
+    try {
+      const searchResponse: any = await makeUniversalSearch(
+        authorization,
+        gameQuery,
+        domain as any,
+      );
+      const domainResponses: any[] = searchResponse?.domainResponses ?? [];
+      const candidates = domainResponses.flatMap((item) => item?.results ?? []);
+      const gameResult = candidates.find((result) => {
+        const type = (result?.mediaType ?? result?.type ?? "")
+          .toString()
+          .toLowerCase();
+        return type.includes("game");
+      });
+      const npCommunicationId =
+        gameResult?.id?.npCommunicationId ||
+        gameResult?.id?.communicationId ||
+        gameResult?.id?.value ||
+        gameResult?.metadata?.npCommunicationId;
+      if (npCommunicationId) {
+        return npCommunicationId;
+      }
+      errors.push(
+        `Domain ${domain} did not return a result with an NP Communication ID.`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`Domain ${domain} failed: ${message}`);
     }
-    return npCommunicationId;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new CliError(`Failed to resolve NP Communication ID: ${message}`, 3);
   }
+
+  const combinedMessage =
+    errors.length > 0
+      ? errors.join(" ")
+      : "No results contained an NP Communication ID.";
+  throw new CliError(
+    `Failed to resolve NP Communication ID: ${combinedMessage}`,
+    3,
+  );
+
 }
 
 function normalizeGroupId(groupId: string | undefined): string {
@@ -204,7 +238,9 @@ export async function fetchTrophies(
           name: trophy?.trophyName ?? trophy?.name ?? "",
           description: trophy?.trophyDetail ?? trophy?.detail ?? "",
           rarity_bucket: typeof rarity === "string" ? rarity : String(rarity ?? ""),
+
           earned_rate_pct: typeof earnedRate === "number" ? `${earnedRate}%` : earnedRate,
+
           hidden: trophy?.trophyHidden ? "true" : "false",
           icon: trophy?.trophyIconUrl ?? trophy?.iconUrl ?? "",
           np_communication_id: npCommunicationId,
@@ -230,12 +266,14 @@ function sortRows(rows: TrophyRow[]): TrophyRow[] {
     if (a.hidden !== b.hidden) {
       return a.hidden === "true" ? 1 : -1;
     }
+
     const rateA = typeof a.earned_rate_pct === "number" ? a.earned_rate_pct : 
                   typeof a.earned_rate_pct === "string" && a.earned_rate_pct.endsWith("%") ? 
                     parseFloat(a.earned_rate_pct.slice(0, -1)) : -Infinity;
     const rateB = typeof b.earned_rate_pct === "number" ? b.earned_rate_pct : 
                   typeof b.earned_rate_pct === "string" && b.earned_rate_pct.endsWith("%") ? 
                     parseFloat(b.earned_rate_pct.slice(0, -1)) : -Infinity;
+
     return rateB - rateA;
   });
 }
