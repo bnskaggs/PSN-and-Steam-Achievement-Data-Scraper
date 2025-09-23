@@ -39,6 +39,7 @@ Two lightweight CLI tools for exporting global achievement/trophy data from Stea
 - Text localization depends on the Steam `--lang` option and your PSN account region.
 
 
+<<<<<<< HEAD
 ## One-off PSN trophy page → CSV (Playwright)
 
 This tool extracts trophy lists and global rarity % from public pages (PSNProfiles / Exophase) without NPWR or PSN login.
@@ -63,3 +64,8 @@ Notes:
 
 
 
+=======
+## To Do
+- figure how to get reliable access to NPWR for PS5 search
+- Global Trophy completion info is seemingly omitted if you don't own the game
+>>>>>>> 9a45474 (Reworked PSN trophies so it actually returns data)
