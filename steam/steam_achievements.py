@@ -18,6 +18,7 @@ API_SCHEMA_URL = "https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/
 
 
 
+
 REQUEST_TIMEOUT = 20
 RETRY_STATUS = {500, 502, 503, 504}
 
@@ -163,6 +164,7 @@ def generate_rows(
                 "icon_gray": meta.get("icon_gray", ""),
 
     "global_percent": f"{percent:.6f}%" if isinstance(percent, float) else "",
+
 
             }
         )

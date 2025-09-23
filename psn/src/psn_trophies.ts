@@ -32,6 +32,7 @@ type TrophyRow = {
   earned_rate_pct: number | string | "";
 
 
+
   hidden: "true" | "false";
   icon: string;
   np_communication_id: string;
@@ -125,8 +126,6 @@ export async function authFromNpsso(npsso: string): Promise<Authorization> {
     throw new CliError(`PSN authentication failed: ${message}`, 3);
   }
 }
-
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -135,7 +134,12 @@ function looksLikeNpCommunicationId(value: string): boolean {
   return /^NPWR[0-9A-Z]{5,}_[0-9]{2}$/i.test(value.trim());
 }
 
-function extractNpCommunicationId(value: unknown, visited = new Set<any>()): string | undefined {
+
+function extractNpCommunicationId(
+  value: unknown,
+  visited: Set<unknown> = new Set<unknown>(),
+): string | undefined {
+
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (!trimmed) {
@@ -188,53 +192,91 @@ function extractNpCommunicationId(value: unknown, visited = new Set<any>()): str
 }
 
 
-  const searchDomains = [
-    "ConceptGame",
-    "GameContent",
-    "UnifiedGameAndDlc",
-    "Game",
-    "SocialAllAccounts",
-  ];
+type SearchDomain =
+  | "ConceptGame"
+  | "GameContent"
+  | "UnifiedGameAndDlc"
+  | "Game"
+  | "SocialAllAccounts";
+
+const SEARCH_DOMAINS: ReadonlyArray<SearchDomain> = [
+  "ConceptGame",
+  "GameContent",
+  "UnifiedGameAndDlc",
+  "Game",
+  "SocialAllAccounts",
+];
+
+function collectDomainResults(searchResponse: unknown): unknown[] {
+  if (!isRecord(searchResponse)) {
+    return [];
+  }
+
+  const domainResponses = Array.isArray(searchResponse.domainResponses)
+    ? searchResponse.domainResponses
+    : [];
+
+  const allResults: unknown[] = [];
+  for (const domainResponse of domainResponses) {
+    if (!isRecord(domainResponse)) {
+      continue;
+    }
+    const results = Array.isArray(domainResponse.results)
+      ? domainResponse.results
+      : [];
+    allResults.push(...results);
+  }
+
+  return allResults;
+}
+
+function pickBestResult(candidates: unknown[]): string | undefined {
+  let bestMatch: { id: string; likelyGame: boolean } | undefined;
+
+  for (const candidate of candidates) {
+    const npCommunicationId = extractNpCommunicationId(candidate);
+    if (!npCommunicationId) {
+      continue;
+    }
+
+    const type = isRecord(candidate)
+      ? String(candidate.mediaType ?? candidate.type ?? "").toLowerCase()
+      : "";
+    const isLikelyGame = type.includes("game");
+
+    if (!bestMatch || (!bestMatch.likelyGame && isLikelyGame)) {
+      bestMatch = { id: npCommunicationId, likelyGame: isLikelyGame };
+    }
+
+    if (isLikelyGame) {
+      break;
+    }
+  }
+
+  return bestMatch?.id;
+}
+
+export async function findNpCommunicationId(
+  authorization: Authorization,
+  gameQuery: string,
+): Promise<string> {
   const errors: string[] = [];
 
-  for (const domain of searchDomains) {
+  for (const domain of SEARCH_DOMAINS) {
     try {
-      const searchResponse: any = await makeUniversalSearch(
+      const searchResponse = await makeUniversalSearch(
+
         authorization,
         gameQuery,
         domain as any,
       );
-      const domainResponses: any[] = searchResponse?.domainResponses ?? [];
-      const candidates = domainResponses.flatMap((item) => item?.results ?? []);
 
-      let bestMatch: { id: string; likelyGame: boolean } | undefined;
+      const candidates = collectDomainResults(searchResponse);
+      const match = pickBestResult(candidates);
 
-      for (const result of candidates) {
-        const npCommunicationId = extractNpCommunicationId(result);
-        if (!npCommunicationId) {
-          continue;
-        }
+      if (match) {
+        return match;
 
-        const type = (result?.mediaType ?? result?.type ?? "")
-          .toString()
-          .toLowerCase();
-        const isLikelyGame = type.includes("game");
-
-        if (!bestMatch || (!bestMatch.likelyGame && isLikelyGame)) {
-          bestMatch = {
-            id: npCommunicationId,
-            likelyGame: isLikelyGame,
-          };
-        }
-
-        if (isLikelyGame) {
-          break;
-        }
-      }
-
-      if (bestMatch) {
-        return bestMatch.id;
-      }
 
       errors.push(
         `Domain ${domain} did not return a result with an NP Communication ID.`,
@@ -312,7 +354,9 @@ export async function fetchTrophies(
           description: trophy?.trophyDetail ?? trophy?.detail ?? "",
           rarity_bucket: typeof rarity === "string" ? rarity : String(rarity ?? ""),
 
+
           earned_rate_pct: typeof earnedRate === "number" ? `${earnedRate}%` : earnedRate,
+
 
 
           hidden: trophy?.trophyHidden ? "true" : "false",
@@ -341,12 +385,14 @@ function sortRows(rows: TrophyRow[]): TrophyRow[] {
       return a.hidden === "true" ? 1 : -1;
     }
 
+
     const rateA = typeof a.earned_rate_pct === "number" ? a.earned_rate_pct : 
                   typeof a.earned_rate_pct === "string" && a.earned_rate_pct.endsWith("%") ? 
                     parseFloat(a.earned_rate_pct.slice(0, -1)) : -Infinity;
     const rateB = typeof b.earned_rate_pct === "number" ? b.earned_rate_pct : 
                   typeof b.earned_rate_pct === "string" && b.earned_rate_pct.endsWith("%") ? 
                     parseFloat(b.earned_rate_pct.slice(0, -1)) : -Infinity;
+
 
 
     return rateB - rateA;

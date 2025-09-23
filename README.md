@@ -13,8 +13,10 @@ Two lightweight CLI tools for exporting global achievement/trophy data from Stea
 
 ### Run
 
+
 - `python steam_achievements.py --appid 1364780`
 - `python steam_achievements.py --appid 1364780 --lang french --out portal2_fr.csv`
+
 
 
 ### Output CSV columns
