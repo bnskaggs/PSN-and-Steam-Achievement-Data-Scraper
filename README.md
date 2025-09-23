@@ -40,3 +40,8 @@ Two lightweight CLI tools for exporting global achievement/trophy data from Stea
 - Steam hidden achievements may lack descriptions until unlocked.
 - PSN endpoints rely on community documentation and require your own account credentials. Respect Sony's Terms of Service.
 - Text localization depends on the Steam `--lang` option and your PSN account region.
+
+
+## To Do
+- figure how to get reliable access to NPWR for PS5 search
+- Global Trophy completion info is seemingly omitted if you don't own the game
