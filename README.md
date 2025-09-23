@@ -12,8 +12,10 @@ Two lightweight CLI tools for exporting global achievement/trophy data from Stea
 5. Copy `.env.example` to `.env` and set `STEAM_API_KEY`
 
 ### Run
+
 - `python steam_achievements.py --appid 1364780`
 - `python steam_achievements.py --appid 1364780 --lang french --out portal2_fr.csv`
+
 
 ### Output CSV columns
 `api_name,title,description,hidden,icon,icon_gray,global_percent`

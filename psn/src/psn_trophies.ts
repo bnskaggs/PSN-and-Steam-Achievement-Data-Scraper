@@ -28,9 +28,9 @@ type TrophyRow = {
   description: string;
   rarity_bucket: string;
 
-  earned_rate_pct: number | "";
 
   earned_rate_pct: number | string | "";
+
 
   hidden: "true" | "false";
   icon: string;
@@ -126,10 +126,67 @@ export async function authFromNpsso(npsso: string): Promise<Authorization> {
   }
 }
 
-export async function findNpCommunicationId(
-  authorization: Authorization,
-  gameQuery: string,
-): Promise<string> {
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function looksLikeNpCommunicationId(value: string): boolean {
+  return /^NPWR[0-9A-Z]{5,}_[0-9]{2}$/i.test(value.trim());
+}
+
+function extractNpCommunicationId(value: unknown, visited = new Set<any>()): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    if (looksLikeNpCommunicationId(trimmed)) {
+      return trimmed.toUpperCase();
+    }
+    const embedded = trimmed.match(/NPWR[0-9A-Z]{5,}_[0-9]{2}/i);
+    if (embedded) {
+      return embedded[0].toUpperCase();
+    }
+    return undefined;
+  }
+
+  if (!isRecord(value) || visited.has(value)) {
+    return undefined;
+  }
+
+  visited.add(value);
+
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === "string") {
+      if (/(^|_)npcommunicationid$/i.test(key)) {
+        const trimmed = entry.trim();
+        if (looksLikeNpCommunicationId(trimmed)) {
+          return trimmed.toUpperCase();
+        }
+      }
+      const fromString = extractNpCommunicationId(entry, visited);
+      if (fromString) {
+        return fromString;
+      }
+    } else if (Array.isArray(entry)) {
+      for (const item of entry) {
+        const fromArray = extractNpCommunicationId(item, visited);
+        if (fromArray) {
+          return fromArray;
+        }
+      }
+    } else if (isRecord(entry)) {
+      const fromObject = extractNpCommunicationId(entry, visited);
+      if (fromObject) {
+        return fromObject;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 
   const searchDomains = [
     "ConceptGame",
@@ -149,20 +206,36 @@ export async function findNpCommunicationId(
       );
       const domainResponses: any[] = searchResponse?.domainResponses ?? [];
       const candidates = domainResponses.flatMap((item) => item?.results ?? []);
-      const gameResult = candidates.find((result) => {
+
+      let bestMatch: { id: string; likelyGame: boolean } | undefined;
+
+      for (const result of candidates) {
+        const npCommunicationId = extractNpCommunicationId(result);
+        if (!npCommunicationId) {
+          continue;
+        }
+
         const type = (result?.mediaType ?? result?.type ?? "")
           .toString()
           .toLowerCase();
-        return type.includes("game");
-      });
-      const npCommunicationId =
-        gameResult?.id?.npCommunicationId ||
-        gameResult?.id?.communicationId ||
-        gameResult?.id?.value ||
-        gameResult?.metadata?.npCommunicationId;
-      if (npCommunicationId) {
-        return npCommunicationId;
+        const isLikelyGame = type.includes("game");
+
+        if (!bestMatch || (!bestMatch.likelyGame && isLikelyGame)) {
+          bestMatch = {
+            id: npCommunicationId,
+            likelyGame: isLikelyGame,
+          };
+        }
+
+        if (isLikelyGame) {
+          break;
+        }
       }
+
+      if (bestMatch) {
+        return bestMatch.id;
+      }
+
       errors.push(
         `Domain ${domain} did not return a result with an NP Communication ID.`,
       );
@@ -241,6 +314,7 @@ export async function fetchTrophies(
 
           earned_rate_pct: typeof earnedRate === "number" ? `${earnedRate}%` : earnedRate,
 
+
           hidden: trophy?.trophyHidden ? "true" : "false",
           icon: trophy?.trophyIconUrl ?? trophy?.iconUrl ?? "",
           np_communication_id: npCommunicationId,
@@ -273,6 +347,7 @@ function sortRows(rows: TrophyRow[]): TrophyRow[] {
     const rateB = typeof b.earned_rate_pct === "number" ? b.earned_rate_pct : 
                   typeof b.earned_rate_pct === "string" && b.earned_rate_pct.endsWith("%") ? 
                     parseFloat(b.earned_rate_pct.slice(0, -1)) : -Infinity;
+
 
     return rateB - rateA;
   });
