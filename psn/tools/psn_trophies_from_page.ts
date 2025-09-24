@@ -92,12 +92,13 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
         return '';
       };
 
-      const toNumber = (input: string) => {
-        const percentMatch = input.match(/(\d+(?:\.\d+)?)%/);
-        if (percentMatch) return Number(percentMatch[1]);
-        const match = input.match(/(\d+(?:\.\d+)?)/);
-        return match ? Number(match[1]) : '';
-      };
+      const toNumber = (input: string): number | "" => {
+	  const percentMatch = input.match(/(\d+(?:\.\d+)?)%/);
+		if (percentMatch) return Number(percentMatch[1]);
+		const match = input.match(/(\d+(?:\.\d+)?)/);
+	  return match ? Number(match[1]) : "";  // literal empty string
+	  };
+
 
       const toAbsolute = (value: string | null) => {
         if (!value) return '';
