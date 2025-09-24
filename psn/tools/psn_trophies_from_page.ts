@@ -340,14 +340,17 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
     );
     return firstIndex === index;
   });
+
 }
 
 async function extractFromExophase(page: Page): Promise<Row[]> {
   // Typical row pattern: .award or .game__achievement
   await page.waitForSelector('.award, .game__achievement', { timeout: 15000 }).catch(() => {});
+
   const rows: Row[] = await page.$$eval(
     '.award, .game__achievement',
     (elements: Element[], href: string) => {
+
       const text = (el: Element, sel: string) => {
         const t = (el.querySelector(sel)?.textContent || '').trim();
         return t.replace(/\s+/g, ' ');
@@ -389,6 +392,7 @@ async function extractFromExophase(page: Page): Promise<Row[]> {
 async function extract(url: string): Promise<Row[]> {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({
+
     userAgent:
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   });
@@ -399,6 +403,7 @@ async function extract(url: string): Promise<Row[]> {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(1000);
+
 
     if (/psnprofiles\.com/i.test(url)) return await extractFromPsnProfiles(page);
     if (/exophase\.com/i.test(url)) return await extractFromExophase(page);

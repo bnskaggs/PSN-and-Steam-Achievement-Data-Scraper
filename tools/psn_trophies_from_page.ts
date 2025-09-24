@@ -3,6 +3,7 @@
 //   npx ts-node tools/psn_trophies_from_page.ts --url "https://psnprofiles.com/trophies/22414-street-fighter-6" --out sf6_psnprofiles.csv
 //   npx ts-node tools/psn_trophies_from_page.ts --url "https://www.exophase.com/game/street-fighter-6-ps4/trophies/" --out sf6_exophase.csv
 
+
 import { chromium, type Page } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -449,3 +450,4 @@ async function extract(url: string): Promise<Row[]> {
   fs.writeFileSync(out, rowsToCsv(rows), 'utf8');
   console.log(`Wrote ${rows.length} trophies to ${out}`);
 })();
+
