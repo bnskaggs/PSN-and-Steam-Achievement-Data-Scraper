@@ -4,6 +4,8 @@ psn/.env
 *_achievements.csv
 psn/node_modules/
 psn/search_debug.json
-psn/psn_street-fighter-6.csv
-psn/debug_artifacts/debug_page.html
-psn/debug_artifacts/debug_screenshot.png
+
+
+psn/debug_artifacts/
+
+psn/*.csv
