@@ -19,25 +19,6 @@ Two lightweight CLI tools for exporting global achievement/trophy data from Stea
 ### Output CSV columns
 `api_name,title,description,hidden,icon,icon_gray,global_percent`
 
-## PlayStation trophies (TypeScript/Node)
-
-### Setup
-1. `cd psn`
-2. `npm install`
-3. Copy `.env.example` to `.env` and set `PSN_NPSSO`
-
-### Run
-- `npm start -- --query "Astro's Playroom"`
-- `npm start -- --query "Ghost of Tsushima" --group base --out got_base.csv`
-
-### Output CSV columns
-`trophy_id,name,description,rarity_bucket,earned_rate_pct,hidden,icon,np_communication_id,group_id`
-
-## Notes
-- Steam hidden achievements may lack descriptions until unlocked.
-- PSN endpoints rely on community documentation and require your own account credentials. Respect Sony's Terms of Service.
-- Text localization depends on the Steam `--lang` option and your PSN account region.
-
 
 <<<<<<< HEAD
 ## One-off PSN trophy page → CSV (Playwright)
@@ -64,8 +45,23 @@ Notes:
 
 
 
-=======
-## To Do
-- figure how to get reliable access to NPWR for PS5 search
-- Global Trophy completion info is seemingly omitted if you don't own the game
->>>>>>> 9a45474 (Reworked PSN trophies so it actually returns data)
+
+## PlayStation trophies (TypeScript/Node) 
+this requires knowing the NPWR of the specific game you're looking for. Also if you don't own the game on the PSN_NPSSO account, it doesn't seem like the API will return you a global completion percentage. 
+Leaving this here because it technically works, but seems to have limited usefulness.
+### Setup
+1. `cd psn`
+2. `npm install`
+3. Copy `.env.example` to `.env` and set `PSN_NPSSO`
+
+### Run
+- `npm start -- --query "Astro's Playroom" --npwr NPWRxxxxx_yy
+- `npm start -- --query "Ghost of Tsushima" --group base --out got_base.csv --npwr NPWRxxxxx_yy'
+
+### Output CSV columns
+`trophy_id,name,description,rarity_bucket,earned_rate_pct,hidden,icon,np_communication_id,group_id`
+
+## Notes
+- Steam hidden achievements may lack descriptions until unlocked.
+- PSN endpoints rely on community documentation and require your own account credentials. Respect Sony's Terms of Service.
+- Text localization depends on the Steam `--lang` option and your PSN account region.
