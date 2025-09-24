@@ -13,11 +13,7 @@ from dotenv import load_dotenv
 
 API_GLOBAL_URL = "https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/"
 
-
 API_SCHEMA_URL = "https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/"
-
-
-
 
 REQUEST_TIMEOUT = 20
 RETRY_STATUS = {500, 502, 503, 504}

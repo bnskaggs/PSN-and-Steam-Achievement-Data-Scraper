@@ -13,11 +13,8 @@ Two lightweight CLI tools for exporting global achievement/trophy data from Stea
 
 ### Run
 
-
-- `python steam_achievements.py --appid 1364780`
-- `python steam_achievements.py --appid 1364780 --lang french --out portal2_fr.csv`
-
-
+- `python steam_achievements.py --appid 620`
+- `python steam_achievements.py --appid 620 --lang french --out portal2_fr.csv`
 
 ### Output CSV columns
 `api_name,title,description,hidden,icon,icon_gray,global_percent`
@@ -42,6 +39,27 @@ Two lightweight CLI tools for exporting global achievement/trophy data from Stea
 - Text localization depends on the Steam `--lang` option and your PSN account region.
 
 
-## To Do
-- figure how to get reliable access to NPWR for PS5 search
-- Global Trophy completion info is seemingly omitted if you don't own the game
+## One-off PSN trophy page → CSV (Playwright)
+
+This tool extracts trophy lists and global rarity % from public pages (PSNProfiles / Exophase) without NPWR or PSN login.
+
+### Install once
+npm i -D playwright ts-node typescript @types/node
+npx playwright install chromium
+
+### Usage
+# PSNProfiles:
+npx ts-node tools/psn_trophies_from_page.ts --url "https://psnprofiles.com/trophies/22414-street-fighter-6" --out sf6_psnprofiles.csv
+
+# Exophase:
+npx ts-node tools/psn_trophies_from_page.ts --url "https://www.exophase.com/game/street-fighter-6-ps4/trophies/" --out sf6_exophase.csv
+
+Outputs CSV columns:
+trophy_id,title,description,rarity_percent,rarity_bucket,hidden,icon,source_url
+
+Notes:
+- Be respectful: one page at a time, cache results, do not hammer sites.
+- Site HTML may change; update selectors in tools/psn_trophies_from_page.ts if parse fails.
+
+
+
