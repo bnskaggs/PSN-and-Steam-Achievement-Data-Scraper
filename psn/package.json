@@ -4,16 +4,18 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc",
+
     "start": "ts-node src/psn_trophies.ts",
     "scrape:psnpage": "ts-node tools/psn_trophies_from_page.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "psn-api": "^1.20.1"
+     "psn-api": "^2.14.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "playwright": "^1.47.0",
+
     "ts-node": "^10.9.2",
     "typescript": "^5.4.0"
   }

@@ -1,0 +1,7 @@
+steam/.env
+psn/.env
+.venv/
+*_achievements.csv
+psn/node_modules/
+psn/search_debug.json
+psn/psn_street-fighter-6.csv

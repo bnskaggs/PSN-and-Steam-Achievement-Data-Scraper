@@ -12,6 +12,7 @@ Two lightweight CLI tools for exporting global achievement/trophy data from Stea
 5. Copy `.env.example` to `.env` and set `STEAM_API_KEY`
 
 ### Run
+
 - `python steam_achievements.py --appid 620`
 - `python steam_achievements.py --appid 620 --lang french --out portal2_fr.csv`
 
@@ -37,6 +38,7 @@ Two lightweight CLI tools for exporting global achievement/trophy data from Stea
 - PSN endpoints rely on community documentation and require your own account credentials. Respect Sony's Terms of Service.
 - Text localization depends on the Steam `--lang` option and your PSN account region.
 
+
 ## One-off PSN trophy page → CSV (Playwright)
 
 This tool extracts trophy lists and global rarity % from public pages (PSNProfiles / Exophase) without NPWR or PSN login.
@@ -58,3 +60,6 @@ trophy_id,title,description,rarity_percent,rarity_bucket,hidden,icon,source_url
 Notes:
 - Be respectful: one page at a time, cache results, do not hammer sites.
 - Site HTML may change; update selectors in tools/psn_trophies_from_page.ts if parse fails.
+
+
+
