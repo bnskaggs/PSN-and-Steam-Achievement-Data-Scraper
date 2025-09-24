@@ -11,7 +11,7 @@ type Row = {
   trophy_id: string;
   title: string;
   description: string;
-  rarity_percent: number | '';
+  rarity_percent: string;
   rarity_bucket: string;
   hidden: boolean;
   icon: string;
@@ -250,56 +250,66 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
       const normalize = (value: string | null | undefined) =>
         (value || '').replace(/\s+/g, ' ').trim();
 
-      const getText = (root: Element | null, candidates: string[]) => {
-        if (!root) return '';
+
+      const getTextWithNode = (root: Element | null, candidates: string[]) => {
+        if (!root) return { text: '', node: null as Element | null };
+
         for (const candidate of candidates) {
           const target = candidate === ':self' ? root : root.querySelector(candidate);
           if (!target) continue;
           const value = normalize(target.textContent);
-          if (value) return value;
+
+          if (value) return { text: value, node: target };
         }
-        return '';
+        return { text: '', node: null as Element | null };
       };
 
-
-      const gatherDescription = (cell: Element | null, titleText: string) => {
+      const gatherDescription = (
+        cell: Element | null,
+        titleElement: HTMLAnchorElement | null,
+        titleText: string,
+      ) => {
         if (!cell) return '';
-        const parts: string[] = [];
-        for (const node of Array.from(cell.childNodes)) {
-          if (node.nodeType === Node.TEXT_NODE) {
-            const text = normalize(node.textContent);
-            if (text) parts.push(text);
-            continue;
-          }
-          if (!(node instanceof Element)) continue;
-          if (node.matches('a.title, a.trophy_title, a[href*="/trophy/"]')) {
-            continue;
-          }
-          if (node.nodeName === 'BR') {
-            parts.push('\n');
-            continue;
-          }
-          const text = normalize(node.textContent);
-          if (text) parts.push(text);
-        }
 
-        const description = normalize(parts.join(' ').replace(/\s*\n\s*/g, ' '));
-        if (description) return description;
+        if (titleElement && titleElement.parentElement === cell) {
+          let sibling = titleElement.nextSibling;
+          while (sibling) {
+            if (sibling.nodeType === Node.TEXT_NODE) {
+              const text = normalize(sibling.textContent);
+              if (text) return text;
+            } else if (sibling instanceof Element) {
+              if (sibling.matches('br')) {
+                sibling = sibling.nextSibling;
+                continue;
+              }
+              const text = normalize(sibling.textContent);
+              if (text) return text;
+            }
+            sibling = sibling.nextSibling;
+          }
+        }
 
         const cellText = normalize(cell.textContent);
         if (!cellText) return '';
-        const trimmed = titleText ? normalize(cellText.replace(titleText, '')) : cellText;
-        if (trimmed && trimmed !== titleText) {
-          return trimmed;
+        let trimmed = cellText;
+        if (titleText) {
+          const idx = trimmed.indexOf(titleText);
+          if (idx !== -1) {
+            trimmed = `${trimmed.slice(0, idx)} ${trimmed.slice(idx + titleText.length)}`;
+          }
+
         }
-        return '';
+        trimmed = normalize(trimmed.replace(/^[:\-\s]+/, ''));
+        return trimmed;
       };
 
-      const toNumber = (input: string) => {
+
+      const toPercentString = (input: string) => {
+
         const percentMatch = input.match(/(\d+(?:\.\d+)?)%/);
-        if (percentMatch) return Number(percentMatch[1]);
+        if (percentMatch) return `${percentMatch[1]}%`;
         const match = input.match(/(\d+(?:\.\d+)?)/);
-        return match ? Number(match[1]) : '';
+        return match ? `${match[1]}%` : '';
       };
 
 
@@ -312,8 +322,31 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
         }
       };
 
+      const isInDisallowedContainer = (el: Element) => {
+        const disallowedSelectors = [
+          '.comment',
+          '.comments',
+          '#comments',
+          '.commentary',
+          '.forum',
+          '#forum',
+          '.message',
+          '.post',
+          '#comment',
+          '.trophy-comments',
+        ];
+        for (const selector of disallowedSelectors) {
+          if (el.closest(selector)) return true;
+        }
+        return false;
+      };
+
       return elements
         .map((el) => {
+
+          if (!(el instanceof HTMLElement)) return null;
+          if (isInDisallowedContainer(el)) return null;
+
           const mainCell =
             (el.querySelector('td .title')?.closest('td') as HTMLElement | null) ||
             (el.querySelector('td:nth-child(2)') as HTMLElement | null) ||
@@ -321,7 +354,9 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
             (el.querySelector('td') as HTMLElement | null) ||
             (el as HTMLElement);
 
-          const title = getText(mainCell, [
+
+          const { text: title, node: titleNode } = getTextWithNode(mainCell, [
+
             '.title a',
             '.title',
             '.trophy_title a',
@@ -335,7 +370,15 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
           ]);
           if (!title) return null;
 
-          const description = gatherDescription(mainCell, title);
+
+          const titleElement =
+            (titleNode?.closest('a') as HTMLAnchorElement | null) ||
+            (mainCell?.querySelector('a.title, a.trophy_title, .trophy-card__title a, a[href*="/trophy/"]') as
+              | HTMLAnchorElement
+              | null);
+          if (!titleElement) return null;
+
+          const description = gatherDescription(mainCell, titleElement, title);
 
           const rarityTargets = [
             el.querySelector('.hover-show .typo-top'),
@@ -352,7 +395,12 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
           const rarityText = normalize(
             rarityTargets.map((node) => normalize(node?.textContent)).find((value) => value) || '',
           );
-          const rarity_percent = toNumber(rarityText);
+
+          if (!/%/.test(rarityText)) {
+            return null;
+          }
+          const rarity_percent = toPercentString(rarityText);
+
           const rarity_bucket = (rarityText.match(/Ultra Rare|Very Rare|Rare|Uncommon|Common|Legendary|Epic/i)?.[0] || '').trim();
 
           const iconEl = el.querySelector('img[data-src], img[data-lazy-src], picture img, img[src]') as
@@ -365,7 +413,9 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
               null,
           );
 
-          const titleLink = mainCell?.querySelector('a[href*="/trophy/"]') as HTMLAnchorElement | null;
+
+          const titleLink = titleElement;
+
           const hrefCandidate = titleLink?.getAttribute('href') ||
             (el.querySelector('a[href*="/trophy/"]') as HTMLAnchorElement | null)?.getAttribute('href') ||
             '';
@@ -433,14 +483,15 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
       }
     };
 
-    const toNumber = (value: unknown) => {
-      if (typeof value === 'number' && !Number.isNaN(value)) return value;
+    const toPercentString = (value: unknown) => {
+      if (typeof value === 'number' && !Number.isNaN(value)) {
+        return `${String(value)}%`;
+      }
       if (typeof value === 'string') {
+        const percentMatch = value.match(/(\d+(?:\.\d+)?)%/);
+        if (percentMatch) return `${percentMatch[1]}%`;
         const match = value.match(/(\d+(?:\.\d+)?)/);
-        if (match) {
-          const n = Number(match[1]);
-          if (!Number.isNaN(n)) return n;
-        }
+        if (match) return `${match[1]}%`;
       }
       return '';
     };
@@ -460,13 +511,13 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
 
       const rarityObj = raw.trophyRare || raw.rarity || raw.trophyRarity || {};
       const rarityPercent =
-        toNumber(raw.trophyEarnedRate) ||
-        toNumber(raw.trophyEarnedRatePercent) ||
-        toNumber(raw.earnedRate) ||
-        toNumber(raw.earnedRatePercentage) ||
-        toNumber(raw.percent) ||
-        toNumber(raw.rarityPercent) ||
-        toNumber(rarityObj.value);
+        toPercentString(raw.trophyEarnedRate) ||
+        toPercentString(raw.trophyEarnedRatePercent) ||
+        toPercentString(raw.earnedRate) ||
+        toPercentString(raw.earnedRatePercentage) ||
+        toPercentString(raw.percent) ||
+        toPercentString(raw.rarityPercent) ||
+        toPercentString(rarityObj.value);
       const rarityBucket =
         (typeof rarityObj === 'object' && rarityObj && typeof rarityObj.name === 'string' && rarityObj.name) ||
         raw.trophyRareName ||
@@ -490,6 +541,8 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
         (rarityObj && typeof rarityObj === 'object' && rarityObj.iconUrl);
 
       const hiddenValue = raw.trophyHidden ?? raw.isHidden ?? raw.hidden ?? false;
+
+      if (!rarityPercent) return;
 
       results.push({
         trophy_id: trophyIdRaw ? String(trophyIdRaw) : '',
@@ -589,18 +642,18 @@ async function extractFromExophase(page: Page): Promise<Row[]> {
         const t = (el.querySelector(sel)?.textContent || '').trim();
         return t.replace(/\s+/g, ' ');
       };
-      const num = (s: string) => {
+      const toPercent = (s: string) => {
         const percentMatch = s.match(/(\d+(?:\.\d+)?)%/);
-        if (percentMatch) return Number(percentMatch[1]);
-        const m = s.match(/(\d+(\.\d+)?)/);
-        return m ? Number(m[1]) : '';
+        if (percentMatch) return `${percentMatch[1]}%`;
+        const m = s.match(/(\d+(?:\.\d+)?)/);
+        return m ? `${m[1]}%` : '';
       };
 
       return elements.map((el) => {
         const title = text(el, '.award__title, .game__achievement__title');
         const description = text(el, '.award__desc, .game__achievement__desc');
         const rarityText = text(el, '.award__rarity, .game__achievement__rarity');
-        const rarityPercent = num(rarityText);
+        const rarityPercent = toPercent(rarityText);
         const bucket = (rarityText.match(/Ultra Rare|Very Rare|Rare|Uncommon|Common/i)?.[0] || '').trim();
         const hidden = /secret|hidden/i.test(title) || /secret|hidden/i.test(description);
         const icon = (el.querySelector('img') as HTMLImageElement | null)?.src || '';
@@ -620,7 +673,7 @@ async function extractFromExophase(page: Page): Promise<Row[]> {
     },
     page.url(),
   );
-  return rows.filter(r => r.title);
+  return rows.filter((r) => r.title && r.rarity_percent);
 }
 
 // --- Router ---
@@ -645,11 +698,13 @@ async function extract(url: string, options: ExtractOptions): Promise<Row[]> {
     // Generic fallback: scan DOM for trophy-like rows
     await page.waitForTimeout(1500);
     const rows: Row[] = await page.evaluate<Row[], string>((href: string) => {
-      function num(s: string) {
+
+      function toPercent(s: string) {
+
         const percentMatch = s.match(/(\d+(?:\.\d+)?)%/);
-        if (percentMatch) return Number(percentMatch[1]);
-        const m = s.match(/(\d+(\.\d+)?)/);
-        return m ? Number(m[1]) : '';
+        if (percentMatch) return `${percentMatch[1]}%`;
+        const m = s.match(/(\d+(?:\.\d+)?)/);
+        return m ? `${m[1]}%` : '';
       }
       const candidates = Array.from(document.querySelectorAll<Element>('tr, .card, .trophy'));
       const out: any[] = [];
@@ -662,7 +717,7 @@ async function extract(url: string, options: ExtractOptions): Promise<Row[]> {
             trophy_id: (el.getAttribute('data-id') || '').toString(),
             title,
             description: desc,
-            rarity_percent: num(rarityText),
+            rarity_percent: toPercent(rarityText),
             rarity_bucket: (rarityText.match(/Ultra Rare|Very Rare|Rare|Uncommon|Common/i)?.[0] || '').trim(),
             hidden: /hidden|secret/i.test(title) || /hidden|secret/i.test(desc),
             icon: (el.querySelector('img') as HTMLImageElement | null)?.src || '',
