@@ -228,12 +228,14 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
     '.trophy-card',
     '.trophy-list__item',
     '[data-trophy-id]',
+    'table.zebra tr',
+    'table tr',
   ];
 
   await waitForAnySelector(page, ROW_SELECTORS, 20000);
 
   const rows = await page.evaluate<Row[], { selectors: string[]; href: string }>(
-    ({ selectors, href }) => {
+    ({ selectors, href }: { selectors: string[]; href: string }) => {
       const seen = new Set<Element>();
       const elements: Element[] = [];
       for (const selector of selectors) {
@@ -245,25 +247,63 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
         }
       }
 
-      const getText = (root: Element, candidates: string[]) => {
+      const normalize = (value: string | null | undefined) =>
+        (value || '').replace(/\s+/g, ' ').trim();
+
+      const getText = (root: Element | null, candidates: string[]) => {
+        if (!root) return '';
         for (const candidate of candidates) {
           const target = candidate === ':self' ? root : root.querySelector(candidate);
           if (!target) continue;
-          const value = (target.textContent || '').trim().replace(/\s+/g, ' ');
+          const value = normalize(target.textContent);
           if (value) return value;
         }
         return '';
       };
 
-      const toNumber = (input: string): number | "" => {
-	  const percentMatch = input.match(/(\d+(?:\.\d+)?)%/);
-		if (percentMatch) return Number(percentMatch[1]);
-		const match = input.match(/(\d+(?:\.\d+)?)/);
-	  return match ? Number(match[1]) : "";  // literal empty string
-	  };
+
+      const gatherDescription = (cell: Element | null, titleText: string) => {
+        if (!cell) return '';
+        const parts: string[] = [];
+        for (const node of Array.from(cell.childNodes)) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = normalize(node.textContent);
+            if (text) parts.push(text);
+            continue;
+          }
+          if (!(node instanceof Element)) continue;
+          if (node.matches('a.title, a.trophy_title, a[href*="/trophy/"]')) {
+            continue;
+          }
+          if (node.nodeName === 'BR') {
+            parts.push('\n');
+            continue;
+          }
+          const text = normalize(node.textContent);
+          if (text) parts.push(text);
+        }
+
+        const description = normalize(parts.join(' ').replace(/\s*\n\s*/g, ' '));
+        if (description) return description;
+
+        const cellText = normalize(cell.textContent);
+        if (!cellText) return '';
+        const trimmed = titleText ? normalize(cellText.replace(titleText, '')) : cellText;
+        if (trimmed && trimmed !== titleText) {
+          return trimmed;
+        }
+        return '';
+      };
+
+      const toNumber = (input: string) => {
+        const percentMatch = input.match(/(\d+(?:\.\d+)?)%/);
+        if (percentMatch) return Number(percentMatch[1]);
+        const match = input.match(/(\d+(?:\.\d+)?)/);
+        return match ? Number(match[1]) : '';
+      };
 
 
-      const toAbsolute = (value: string | null) => {
+      const toAbsolute = (value: string | null | undefined) => {
         if (!value) return '';
         try {
           return new URL(value, href).toString();
@@ -274,7 +314,14 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
 
       return elements
         .map((el) => {
-          const title = getText(el, [
+          const mainCell =
+            (el.querySelector('td .title')?.closest('td') as HTMLElement | null) ||
+            (el.querySelector('td:nth-child(2)') as HTMLElement | null) ||
+            (el.querySelector('td[style*="width"]') as HTMLElement | null) ||
+            (el.querySelector('td') as HTMLElement | null) ||
+            (el as HTMLElement);
+
+          const title = getText(mainCell, [
             '.title a',
             '.title',
             '.trophy_title a',
@@ -282,34 +329,46 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
             '.trophy-card__title a',
             '.trophy-card__title',
             'header .heading',
-            'a[href*="/trophies/"]',
+            'a[href*="/trophy/"]',
             'h3',
             ':self',
           ]);
-          const description = getText(el, [
-            '.small-info',
-            '.trophy_desc',
-            '.info',
-            '.trophy-info',
-            '.trophy-card__description',
-            'p',
-          ]);
-          const rarityText = getText(el, [
-            '.ty-rare',
-            '.rarity',
-            '.small-info .rarity',
-            '.trophy-card__rarity',
-            '.trophy-card__meta',
-          ]);
+          if (!title) return null;
+
+          const description = gatherDescription(mainCell, title);
+
+          const rarityTargets = [
+            el.querySelector('.hover-show .typo-top'),
+            el.querySelector('.hover-show'),
+            el.querySelector('.hover-hide .typo-top'),
+            el.querySelector('.hover-hide'),
+            el.querySelector('.rarity .typo-top'),
+            el.querySelector('.rarity'),
+            el.querySelector('.ty-rare'),
+            el.querySelector('.small-info .rarity'),
+            el.querySelector('.trophy-card__rarity'),
+            el.querySelector('.trophy-card__meta'),
+          ];
+          const rarityText = normalize(
+            rarityTargets.map((node) => normalize(node?.textContent)).find((value) => value) || '',
+          );
           const rarity_percent = toNumber(rarityText);
           const rarity_bucket = (rarityText.match(/Ultra Rare|Very Rare|Rare|Uncommon|Common|Legendary|Epic/i)?.[0] || '').trim();
-          const iconEl = el.querySelector('img[data-src], img[data-lazy-src], img[src]') as HTMLImageElement | null;
+
+          const iconEl = el.querySelector('img[data-src], img[data-lazy-src], picture img, img[src]') as
+            | HTMLImageElement
+            | null;
           const icon = toAbsolute(
             iconEl?.getAttribute('data-src') ||
               iconEl?.getAttribute('data-lazy-src') ||
               iconEl?.getAttribute('src') ||
               null,
           );
+
+          const titleLink = mainCell?.querySelector('a[href*="/trophy/"]') as HTMLAnchorElement | null;
+          const hrefCandidate = titleLink?.getAttribute('href') ||
+            (el.querySelector('a[href*="/trophy/"]') as HTMLAnchorElement | null)?.getAttribute('href') ||
+            '';
 
           const idSources = [
             el.getAttribute('data-trophy-id'),
@@ -318,8 +377,11 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
             el.getAttribute('data-key'),
             el.id,
             iconEl?.getAttribute('data-trophy-id') || iconEl?.id || '',
+            hrefCandidate ? hrefCandidate.split('/').filter(Boolean).pop() || '' : '',
+            hrefCandidate ? hrefCandidate.replace(/^\/+/, '') : '',
           ];
-          const trophy_id = idSources.find((value) => value && value.trim())?.trim() || '';
+          const trophy_id =
+            normalize(idSources.find((value) => normalize(value || '')) || '') || normalize(title);
 
           const hidden =
             /hidden|secret/i.test(title) ||
@@ -339,7 +401,7 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
             source_url: href,
           };
         })
-        .filter((row) => row.title && !/checking your browser/i.test(row.title));
+        .filter((row): row is Row => !!row && !!row.title && !/checking your browser/i.test(row.title));
     },
     { selectors: ROW_SELECTORS, href: page.url() },
   );
@@ -354,7 +416,11 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
 
   if (deduped.length) return deduped;
 
-  const jsonRows = await page.evaluate<Row[], { href: string }>(({ href }) => {
+  const jsonRows = await page.evaluate<Row[], { href: string }>(({
+    href,
+  }: {
+    href: string;
+  }) => {
     const results: Row[] = [];
     const seenKeys = new Set<string>();
 
@@ -474,7 +540,9 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
     };
 
     const scriptNodes = Array.from(
-      document.querySelectorAll('script[type="application/json"], script#__NEXT_DATA__, script#__NUXT_DATA__'),
+      document.querySelectorAll<HTMLScriptElement>(
+        'script[type="application/json"], script#__NEXT_DATA__, script#__NUXT_DATA__',
+      ),
     );
     for (const script of scriptNodes) {
       const text = script.textContent;
@@ -576,14 +644,14 @@ async function extract(url: string, options: ExtractOptions): Promise<Row[]> {
 
     // Generic fallback: scan DOM for trophy-like rows
     await page.waitForTimeout(1500);
-    const rows: Row[] = await page.evaluate<Row[], string>((href) => {
+    const rows: Row[] = await page.evaluate<Row[], string>((href: string) => {
       function num(s: string) {
         const percentMatch = s.match(/(\d+(?:\.\d+)?)%/);
         if (percentMatch) return Number(percentMatch[1]);
         const m = s.match(/(\d+(\.\d+)?)/);
         return m ? Number(m[1]) : '';
       }
-      const candidates = Array.from(document.querySelectorAll('tr, .card, .trophy'));
+      const candidates = Array.from(document.querySelectorAll<Element>('tr, .card, .trophy'));
       const out: any[] = [];
       for (const el of candidates) {
         const title = (el.querySelector('h3, .title, .trophy_title, a')?.textContent || '').trim();
