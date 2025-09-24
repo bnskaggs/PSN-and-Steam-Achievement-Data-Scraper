@@ -50,9 +50,11 @@ function parseArgs(argv: string[]) {
 async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
   // Typical row pattern: .trophy or tr.trophy
   await page.waitForSelector('.trophy, tr.trophy', { timeout: 15000 }).catch(() => {});
+
   const rows: Row[] = await page.$$eval(
     '.trophy, tr.trophy',
     (elements: Element[], href: string) => {
+
       const text = (el: Element, sel: string) => {
         const t = (el.querySelector(sel)?.textContent || '').trim();
         return t.replace(/\s+/g, ' ');
@@ -94,9 +96,11 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
 async function extractFromExophase(page: Page): Promise<Row[]> {
   // Typical row pattern: .award or .game__achievement
   await page.waitForSelector('.award, .game__achievement', { timeout: 15000 }).catch(() => {});
+
   const rows: Row[] = await page.$$eval(
     '.award, .game__achievement',
     (elements: Element[], href: string) => {
+
       const text = (el: Element, sel: string) => {
         const t = (el.querySelector(sel)?.textContent || '').trim();
         return t.replace(/\s+/g, ' ');
