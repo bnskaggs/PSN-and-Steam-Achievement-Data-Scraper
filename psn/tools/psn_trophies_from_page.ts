@@ -250,12 +250,15 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
       const normalize = (value: string | null | undefined) =>
         (value || '').replace(/\s+/g, ' ').trim();
 
+
       const getTextWithNode = (root: Element | null, candidates: string[]) => {
         if (!root) return { text: '', node: null as Element | null };
+
         for (const candidate of candidates) {
           const target = candidate === ':self' ? root : root.querySelector(candidate);
           if (!target) continue;
           const value = normalize(target.textContent);
+
           if (value) return { text: value, node: target };
         }
         return { text: '', node: null as Element | null };
@@ -294,17 +297,21 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
           if (idx !== -1) {
             trimmed = `${trimmed.slice(0, idx)} ${trimmed.slice(idx + titleText.length)}`;
           }
+
         }
         trimmed = normalize(trimmed.replace(/^[:\-\s]+/, ''));
         return trimmed;
       };
 
+
       const toPercentString = (input: string) => {
+
         const percentMatch = input.match(/(\d+(?:\.\d+)?)%/);
         if (percentMatch) return `${percentMatch[1]}%`;
         const match = input.match(/(\d+(?:\.\d+)?)/);
         return match ? `${match[1]}%` : '';
       };
+
 
       const toAbsolute = (value: string | null | undefined) => {
         if (!value) return '';
@@ -336,8 +343,10 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
 
       return elements
         .map((el) => {
+
           if (!(el instanceof HTMLElement)) return null;
           if (isInDisallowedContainer(el)) return null;
+
           const mainCell =
             (el.querySelector('td .title')?.closest('td') as HTMLElement | null) ||
             (el.querySelector('td:nth-child(2)') as HTMLElement | null) ||
@@ -345,7 +354,9 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
             (el.querySelector('td') as HTMLElement | null) ||
             (el as HTMLElement);
 
+
           const { text: title, node: titleNode } = getTextWithNode(mainCell, [
+
             '.title a',
             '.title',
             '.trophy_title a',
@@ -358,6 +369,7 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
             ':self',
           ]);
           if (!title) return null;
+
 
           const titleElement =
             (titleNode?.closest('a') as HTMLAnchorElement | null) ||
@@ -383,10 +395,12 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
           const rarityText = normalize(
             rarityTargets.map((node) => normalize(node?.textContent)).find((value) => value) || '',
           );
+
           if (!/%/.test(rarityText)) {
             return null;
           }
           const rarity_percent = toPercentString(rarityText);
+
           const rarity_bucket = (rarityText.match(/Ultra Rare|Very Rare|Rare|Uncommon|Common|Legendary|Epic/i)?.[0] || '').trim();
 
           const iconEl = el.querySelector('img[data-src], img[data-lazy-src], picture img, img[src]') as
@@ -399,7 +413,9 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
               null,
           );
 
+
           const titleLink = titleElement;
+
           const hrefCandidate = titleLink?.getAttribute('href') ||
             (el.querySelector('a[href*="/trophy/"]') as HTMLAnchorElement | null)?.getAttribute('href') ||
             '';
@@ -682,7 +698,9 @@ async function extract(url: string, options: ExtractOptions): Promise<Row[]> {
     // Generic fallback: scan DOM for trophy-like rows
     await page.waitForTimeout(1500);
     const rows: Row[] = await page.evaluate<Row[], string>((href: string) => {
+
       function toPercent(s: string) {
+
         const percentMatch = s.match(/(\d+(?:\.\d+)?)%/);
         if (percentMatch) return `${percentMatch[1]}%`;
         const m = s.match(/(\d+(?:\.\d+)?)/);
