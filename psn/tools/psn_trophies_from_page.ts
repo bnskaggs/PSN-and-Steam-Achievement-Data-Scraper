@@ -261,6 +261,7 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
         return '';
       };
 
+
       const gatherDescription = (cell: Element | null, titleText: string) => {
         if (!cell) return '';
         const parts: string[] = [];
@@ -300,6 +301,7 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
         const match = input.match(/(\d+(?:\.\d+)?)/);
         return match ? Number(match[1]) : '';
       };
+
 
       const toAbsolute = (value: string | null | undefined) => {
         if (!value) return '';
