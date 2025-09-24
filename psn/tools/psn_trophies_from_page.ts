@@ -49,8 +49,8 @@ function waitForAnySelector(page: Page, selectors: string[], timeout = 20000) {
   return page
     .waitForFunction(
       (sels: string[]) => sels.some((sel) => document.querySelector(sel)),
-      { timeout },
       selectors,
+      { timeout },
     )
     .catch(() => undefined);
 }
@@ -93,6 +93,8 @@ async function extractFromPsnProfiles(page: Page): Promise<Row[]> {
       };
 
       const toNumber = (input: string) => {
+        const percentMatch = input.match(/(\d+(?:\.\d+)?)%/);
+        if (percentMatch) return Number(percentMatch[1]);
         const match = input.match(/(\d+(?:\.\d+)?)/);
         return match ? Number(match[1]) : '';
       };
@@ -356,6 +358,8 @@ async function extractFromExophase(page: Page): Promise<Row[]> {
         return t.replace(/\s+/g, ' ');
       };
       const num = (s: string) => {
+        const percentMatch = s.match(/(\d+(?:\.\d+)?)%/);
+        if (percentMatch) return Number(percentMatch[1]);
         const m = s.match(/(\d+(\.\d+)?)/);
         return m ? Number(m[1]) : '';
       };
@@ -412,6 +416,8 @@ async function extract(url: string): Promise<Row[]> {
     await page.waitForTimeout(1500);
     const rows: Row[] = await page.evaluate<Row[], string>((href) => {
       function num(s: string) {
+        const percentMatch = s.match(/(\d+(?:\.\d+)?)%/);
+        if (percentMatch) return Number(percentMatch[1]);
         const m = s.match(/(\d+(\.\d+)?)/);
         return m ? Number(m[1]) : '';
       }
